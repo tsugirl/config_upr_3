@@ -1,6 +1,7 @@
 import sys
 import re
 
+
 class ConfigTranslator:
     def __init__(self):
         self.constants = {}
@@ -24,12 +25,11 @@ class ConfigTranslator:
 
             # обработка многострочных комментариев
             if multiline_comment:
-                if line.endswith("#"):
+                if line == "|#":  
                     multiline_comment = False
                 continue
-            elif line.startswith("# |"):
-                if not line.endswith("| #"):
-                    multiline_comment = True
+            elif line.startswith("#|"): 
+                multiline_comment = True
                 continue
 
             # удаление однострочных комментариев
@@ -50,38 +50,54 @@ class ConfigTranslator:
         return result
 
     def _parse_constant_definition(self, line):
-        print(f"Defining constant from line: {line.strip()}")
-        match = re.match(r"\(define\s+([a-zA-Z]+)\s+([^\)]+)\)", line)
+        match = re.match(r"\(define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+([^\)]+)\);?", line)
         if not match:
             raise SyntaxError(f"Invalid constant definition: {line}")
         name, value = match.groups()
-        if re.match(r"^\d+$", value):
-            value = int(value)
-        else:
-            raise SyntaxError(f"Invalid constant value: {value}")
-        self.constants[name] = value
+
+        try:
+            self.constants[name] = self._evaluate_expression(value.strip())
+        except ValueError as e:
+            raise ValueError(f"Invalid constant value: {value.strip()}, error: {e}")
 
     def _parse_dictionary(self, line):
-        print(f"Parsing dictionary: {line.strip()}")
-        line = line[1:-1].strip()  # удаление символов "{" и "}" при обработке словарей
-        items = line.split(";")
-        dictionary = {}
+        # удаление незакрытых скобок
+        line = line[1:-1].strip()
 
+        items = re.split(r"\s*;\s*", line)
+
+        dictionary = {}
         for item in items:
             if not item.strip():
                 continue
-            key, value = map(str.strip, item.split(":", 1))
-            if re.match(r"^\d+$", value):
-                value = int(value)
-            else:
-                raise SyntaxError(f"Invalid dictionary value: {value}")
-            dictionary[key] = value
+            try:
+                key, value = map(str.strip, item.split(":", 1))
+                dictionary[key] = self._evaluate_expression(value)
+            except ValueError:
+                raise SyntaxError(f"Invalid dictionary format: {item}")
 
         return dictionary
 
+    def _evaluate_expression(self, value):
+        def replace_constants(match):
+            name = match.group(1)
+            if name not in self.constants:
+                raise ValueError(f"Undefined constant: {name}")
+            return str(self.constants[name])
+
+        try:
+            value = re.sub(r"\^\((\w+)\)", replace_constants, value)
+        except Exception as e:
+            raise ValueError(f"Error replacing constants in: {value}, error: {e}")
+
+        try:
+            return eval(value, {"__builtins__": None}, {})
+        except Exception as e:
+            raise ValueError(f"Invalid expression: {value}, error: {e}")
+
     def to_toml(self, data):
-        print("Converting to TOML...")
         return "[example]\nkey = \"value\"\n"
+
 
 def main():
     if len(sys.argv) != 2:
@@ -98,6 +114,7 @@ def main():
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

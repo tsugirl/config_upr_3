@@ -1,0 +1,7 @@
+#|
+        Многострочный комментарий
+        |#
+        (define CONST1 100);
+        (define CONST2 200);
+        { key1 : ^(CONST1); key2 : ^(CONST2); }
+        

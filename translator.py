@@ -24,26 +24,26 @@ class ConfigTranslator:
         for line in lines:
             line = line.strip()
 
-            # Handle multiline comments
+            # обработка многострочного комментария
             if multiline_comment:
-                if line == "|#":  # Конец многострочного комментария
+                if line == "|#":  
                     multiline_comment = False
                 continue
-            elif line.startswith("#|"):  # Начало многострочного комментария
+            elif line.startswith("#|"):  
                 multiline_comment = True
                 continue
 
-            # Remove single-line comments
+            # удаление однострочного комментария
             line = re.sub(r"#.*", "", line).strip()
             if not line:
                 continue
 
-            # Parse constant definitions
+            # парсинг значений констант
             if line.startswith("(define"):
                 self._parse_constant_definition(line)
                 continue
 
-            # Parse dictionaries
+            # парсинг словарей
             if line.startswith("{") and line.endswith("}"):
                 result.update(self._parse_dictionary(line))
                 continue
@@ -54,16 +54,11 @@ class ConfigTranslator:
 
 
     def _parse_constant_definition(self, line):
-        # Обновляем регулярное выражение
         match = re.match(r"\(define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+([^\)]+)\);?", line)
         if not match:
             raise SyntaxError(f"Invalid constant definition: {line}")
         name, value = match.groups()
 
-        # Debug output
-        #print(f"Parsing constant: {name} = {value.strip()}")
-
-        # Evaluate constant value
         try:
             self.constants[name] = self._evaluate_expression(value.strip())
         except ValueError as e:
@@ -72,29 +67,24 @@ class ConfigTranslator:
 
     def _parse_dictionary(self, line):
         def parse_nested(value):
-            # Если встречаем вложенный словарь, ищем конец в виде "};"
             if value.startswith("{") and value.endswith("}"):
                 return self._parse_dictionary(value)
             return self._evaluate_expression(value)
 
-        # Убираем внешние скобки
         line = line[1:-1].strip()
         
-        # Разделяем строку на элементы словаря, используя ';' как разделитель
-        items = re.split(r"\s*;\s*", line)  # Разделяем по ;
+        items = re.split(r"\s*;\s*", line)
 
         dictionary = {}
         for item in items:
             if not item.strip():
                 continue
             try:
-                # Разделяем на ключ и значение
+                # получение ключа и значения
                 key, value = map(str.strip, item.split(":", 1))
 
-                # Убираем всё, что до ":" (если это не внутренний делитель)
                 value = value.strip()
 
-                # Для каждого значения парсим его выражение (если это вложенный словарь, то рекурсивно)
                 dictionary[key] = parse_nested(value)
             except ValueError:
                 raise SyntaxError(f"Invalid dictionary format: {item}")
@@ -102,7 +92,6 @@ class ConfigTranslator:
         return dictionary
 
     def _evaluate_expression(self, value):
-        # Replace all ^(name) with constant values
         def replace_constants(match):
             name = match.group(1)
             if name not in self.constants:
@@ -110,15 +99,12 @@ class ConfigTranslator:
             return str(self.constants[name])
 
         try:
-            # Replace all occurrences of ^(name)
             value = re.sub(r"\^\((\w+)\)", replace_constants, value)
         except Exception as e:
             raise ValueError(f"Error replacing constants in: {value}, error: {e}")
 
-        # Debug output for evaluating expressions
-        print(f"Evaluating expression: {value}")
+        #print(f"Evaluating expression: {value}") ВЫВОД ДЛЯ ДЕБАГА
 
-        # Try evaluating the expression, handle nested dictionaries
         try:
             if value.startswith("{") and value.endswith("}"):
                 return self._parse_dictionary(value)

@@ -118,6 +118,6 @@ translator.py:
 
 <h2>GitHub</h2>
 Ссылка на github проекта:
-https://github.com/tsugirl/config_upr_1
+https://github.com/tsugirl/config_upr_3
 
 ****
